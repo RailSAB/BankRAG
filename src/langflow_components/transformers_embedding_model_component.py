@@ -12,15 +12,19 @@ class TransformersInferenceEmbeddings(Embeddings):
     def __init__(self, endpoint="http://localhost:8081"):
         self.endpoint = endpoint.rstrip("/")
 
-    def embed_query(self, text: str):
-        res = requests.post(f"{self.endpoint}/v1/encode", json={"text": text})
+    def embed_query(self, text: str) -> list[float]:
+        res = requests.request(method="POST", url=f"{self.endpoint}/vectors", json={"text": text}, headers={"Content-Type": "application/json"})
         res.raise_for_status()
         return res.json()["vector"]
 
-    def embed_documents(self, texts: list[str]):
-        res = requests.post(f"{self.endpoint}/v1/encode_batch", json={"texts": texts})
-        res.raise_for_status()
-        return res.json()["vectors"]
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        result = []
+        for t in texts:
+            res = requests.request(method="POST", url=f"{self.endpoint}/vectors", json={"text": t}, headers={"Content-Type": "application/json"})
+            res.raise_for_status()
+            result.append(res.json()["vector"])
+
+        return result
 
 
 class WeaviateTransformersEmbeddingModelComponent(LCEmbeddingsModel):
