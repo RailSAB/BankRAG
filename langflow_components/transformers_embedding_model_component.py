@@ -9,22 +9,27 @@ from langflow.field_typing import Embeddings as LCEmbeddingType
 
 
 class TransformersInferenceEmbeddings(Embeddings):
-    def __init__(self, endpoint="http://localhost:8081"):
+    def __init__(self, endpoint="http://localhost:8081", timeout=10):
         self.endpoint = endpoint.rstrip("/")
+        self.timeout = timeout
+        self.headers = {"Content-Type": "application/json"}
 
-    def embed_query(self, text: str) -> list[float]:
-        res = requests.request(method="POST", url=f"{self.endpoint}/vectors", json={"text": text}, headers={"Content-Type": "application/json"})
-        res.raise_for_status()
-        return res.json()["vector"]
+    def _post(self, text):
+        text = text.strip()
+        if not text:
+            return [0.0] * 384
+        payload = {"text": text, "config": {}}
+        r = requests.post(f"{self.endpoint}/vectors", json=payload,
+                          headers=self.headers, timeout=self.timeout)
+        if r.status_code != 200:
+            raise Exception(f"Embedding server error {r.status_code}: {r.text}")
+        return r.json()["vector"]
 
-    def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        result = []
-        for t in texts:
-            res = requests.request(method="POST", url=f"{self.endpoint}/vectors", json={"text": t}, headers={"Content-Type": "application/json"})
-            res.raise_for_status()
-            result.append(res.json()["vector"])
+    def embed_query(self, text: str):
+        return self._post(text)
 
-        return result
+    def embed_documents(self, texts):
+        return [self._post(t) for t in texts]
 
 
 class WeaviateTransformersEmbeddingModelComponent(LCEmbeddingsModel):
